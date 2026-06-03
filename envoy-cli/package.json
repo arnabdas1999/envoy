@@ -1,0 +1,33 @@
+{
+  "name": "envoy-cli",
+  "version": "0.1.0",
+  "description": "End-to-end encrypted environment variable manager",
+  "type": "module",
+  "bin": {
+    "envoy": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "conf": "^13.0.0",
+    "dotenv": "^16.4.5",
+    "keytar": "^7.9.0",
+    "ora": "^8.0.1",
+    "undici": "^6.18.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.2",
+    "tsup": "^8.1.0",
+    "tsx": "^4.15.1",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}

@@ -1,0 +1,63 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  cli:
+    name: CLI (typecheck + tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: envoy-cli/package-lock.json
+      - run: cd envoy-cli && npm ci && npm run typecheck && npm test
+
+  web:
+    name: Web (typecheck + build)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: envoy_test
+          POSTGRES_USER: envoy
+          POSTGRES_PASSWORD: envoy
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: envoy-web/package-lock.json
+      - name: Install and run schema migration
+        run: |
+          cd envoy-web
+          npm ci
+          psql "$POSTGRES_URL" -f supabase/migrations/001_initial_schema.sql
+        env:
+          POSTGRES_URL: postgres://envoy:envoy@localhost/envoy_test
+      - name: Typecheck
+        run: cd envoy-web && npm run typecheck
+        env:
+          POSTGRES_URL: postgres://envoy:envoy@localhost/envoy_test
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          JWT_SECRET: test_secret_not_for_production_use_64_hex_chars_minimum
+          RESEND_API_KEY: re_test_placeholder
+          RESEND_FROM: auth@useenvoy.dev
+      - name: Build
+        run: cd envoy-web && npm run build
+        env:
+          POSTGRES_URL: postgres://envoy:envoy@localhost/envoy_test
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          JWT_SECRET: test_secret_not_for_production_use_64_hex_chars_minimum
+          RESEND_API_KEY: re_test_placeholder
+          RESEND_FROM: auth@useenvoy.dev

@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+envoy-cli/dist/
+envoy-web/.next/
+envoy-web/out/
+
+# Environment secrets — never commit these
+envoy-web/.env.local
+envoy-web/.env*.local
+.env
+.env.local
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Vercel
+.vercel/
+
+# Misc
+*.tsbuildinfo
