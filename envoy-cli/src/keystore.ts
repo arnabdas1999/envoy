@@ -49,30 +49,27 @@ export async function loadMasterKey(workspaceId: string): Promise<Buffer> {
 }
 
 export async function storeCliToken(token: string): Promise<void> {
+  // Always write to file — reliable across all platforms and Node versions.
+  // Also attempt keytar for OS-level encryption where available.
+  writeFallback('cli-token', token);
   const keytar = await getKeytar();
   if (keytar) {
-    try {
-      await keytar.setPassword(SERVICE, 'cli-token', token);
-      return;
-    } catch {
-      // Fall through
-    }
+    try { await keytar.setPassword(SERVICE, 'cli-token', token); } catch {}
   }
-  writeFallback('cli-token', token);
 }
 
 export async function loadCliToken(): Promise<string | null> {
+  // File is the primary source (always written). Keytar is supplementary.
+  const fallback = readFallback();
+  if (fallback['cli-token']) return fallback['cli-token'];
   const keytar = await getKeytar();
   if (keytar) {
     try {
       const token = await keytar.getPassword(SERVICE, 'cli-token');
       if (token) return token;
-    } catch {
-      // Fall through
-    }
+    } catch {}
   }
-  const fallback = readFallback();
-  return fallback['cli-token'] ?? null;
+  return null;
 }
 
 export async function clearCliToken(): Promise<void> {

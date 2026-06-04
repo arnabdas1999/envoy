@@ -17,7 +17,7 @@ async function resolveEnvId(config: ReturnType<typeof loadConfig>, envName: stri
   const envs = await api.get<EnvironmentOut[]>(`/v1/projects/${config.projectId}/environments`);
   const env = envs.find(e => e.name === envName);
   if (!env) fatal(`Environment "${envName}" not found. Create it with: envoy env create ${envName}`);
-  return { envId: env!.id, etag: String(Math.floor(new Date(env!.last_modified_at).getTime())) };
+  return { envId: env!.id, etag: `"${new Date(env!.last_modified_at).getTime()}"` };
 }
 
 export function pushCommand(): Command {
@@ -86,7 +86,7 @@ export function pushCommand(): Command {
       try {
         const result = await api.put<BulkPushResponse>(
           `/v1/environments/${envId}/secrets`,
-          { secrets },
+          secrets,
           { 'If-Match': etag },
         );
         spin.succeed(`Pushed ${result.pushed} secret(s) to ${envName}`);

@@ -1,8 +1,11 @@
 {
-  "name": "envoy-cli",
+  "name": "@arnabdas1999/envoy-cli",
   "version": "0.1.0",
   "description": "End-to-end encrypted environment variable manager",
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "bin": {
     "envoy": "./dist/index.js"
   },
