@@ -1,7 +1,7 @@
 import { fetch, RequestInit } from 'undici';
 import { loadCliToken } from '../keystore.js';
 
-const DEFAULT_API_URL = 'https://useenvoy.dev';
+const DEFAULT_API_URL = 'https://envoy-five.vercel.app';
 
 function getApiUrl(): string {
   return process.env.ENVOY_API_URL ?? DEFAULT_API_URL;
