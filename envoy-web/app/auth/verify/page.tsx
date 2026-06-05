@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 
@@ -8,16 +8,15 @@ function VerifyInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
+  const hasRun = useRef(false);
 
   const [status, setStatus] = useState<'verifying' | 'error'>('verifying');
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    if (!token) {
-      setStatus('error');
-      setErrorMsg('No token found in URL.');
-      return;
-    }
+    // Strict Mode double-invokes effects in dev — guard against consuming the token twice
+    if (!token || hasRun.current) return;
+    hasRun.current = true;
 
     async function verify() {
       try {

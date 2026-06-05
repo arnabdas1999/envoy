@@ -1,25 +1,30 @@
-// Simple in-memory rate limiter.
-// Works per-instance (not distributed). For production use Upstash Redis.
+import { Ratelimit } from '@upstash/ratelimit';
+import redis from './redis';
 
-interface Window { count: number; reset: number }
+// Sliding window rate limiters — shared across all Vercel instances via Redis
+const authLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, '60 s'),
+  prefix: 'envoy:rl:auth',
+});
 
-const store = new Map<string, Window>();
+const writeLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(20, '60 s'),
+  prefix: 'envoy:rl:write',
+});
 
-export function checkRateLimit(key: string, limit: number, windowMs: number): boolean {
-  const now = Date.now();
-  const w = store.get(key);
+const readLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(60, '60 s'),
+  prefix: 'envoy:rl:read',
+});
 
-  if (!w || w.reset < now) {
-    store.set(key, { count: 1, reset: now + windowMs });
-    return true;
-  }
-
-  if (w.count >= limit) return false;
-  w.count++;
-  return true;
+async function check(limiter: Ratelimit, ip: string): Promise<boolean> {
+  const { success } = await limiter.limit(ip);
+  return success;
 }
 
-// Preset windows for common endpoint types
-export const AUTH_LIMIT = (ip: string) => checkRateLimit(`auth:${ip}`, 5, 60_000);
-export const WRITE_LIMIT = (ip: string) => checkRateLimit(`write:${ip}`, 20, 60_000);
-export const READ_LIMIT = (ip: string) => checkRateLimit(`read:${ip}`, 60, 60_000);
+export const AUTH_LIMIT  = (ip: string) => check(authLimiter, ip);
+export const WRITE_LIMIT = (ip: string) => check(writeLimiter, ip);
+export const READ_LIMIT  = (ip: string) => check(readLimiter, ip);

@@ -10,10 +10,13 @@ export async function POST(req: NextRequest) {
   const user = await getRequestUser(req);
   if (!user) return unauthorized();
 
-  const rawToken = crypto.randomUUID() + crypto.randomUUID();
-  const tokenHash = await sha256(rawToken);
   const expiresAt = new Date(Date.now() + CLI_TOKEN_DAYS * 86_400_000).toISOString();
 
+  // Issue a signed JWT so getRequestUser can verify it with verifyJwt()
+  const jwt = await signJwt(user.id, user.email, 'cli');
+
+  // Store its hash in auth_tokens for server-side revocation support
+  const tokenHash = await sha256(jwt);
   const [record] = await sql`
     INSERT INTO auth_tokens (user_id, token_hash, type, expires_at)
     VALUES (${user.id}, ${tokenHash}, 'cli', ${expiresAt})
@@ -21,7 +24,7 @@ export async function POST(req: NextRequest) {
   `;
 
   return ok({
-    cli_token: rawToken,
+    cli_token: jwt,
     expires_at: record.expires_at,
     token_id: record.id,
   });

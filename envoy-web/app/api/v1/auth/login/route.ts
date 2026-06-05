@@ -1,7 +1,9 @@
 import { NextRequest } from 'next/server';
 import { ok, err } from '@/lib/errors';
 import { sha256 } from '@/lib/auth-server';
+import { AUTH_LIMIT } from '@/lib/rate-limit';
 import sql from '@/lib/db';
+import redis from '@/lib/redis';
 import { Resend } from 'resend';
 
 const MAGIC_LINK_TTL_SECONDS = 300; // 5 minutes
@@ -12,7 +14,6 @@ async function sendMagicLinkEmail(email: string, token: string) {
 
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey || apiKey.startsWith('re_test')) {
-    // Development: log instead of send
     console.log(`[dev] Magic link for ${email}: ${url}`);
     return;
   }
@@ -31,35 +32,32 @@ async function sendMagicLinkEmail(email: string, token: string) {
 }
 
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for') ?? 'unknown';
+  if (!(await AUTH_LIMIT(ip))) {
+    return err('RATE_LIMITED', 'Too many requests. Please wait a minute.', 429);
+  }
+
   const body = await req.json().catch(() => null);
   const email = body?.email?.trim()?.toLowerCase();
   if (!email || !email.includes('@')) {
     return err('INVALID_EMAIL', 'A valid email address is required.', 400);
   }
 
-  // Generate a random 48-char token and store its hash in the DB
-  const rawToken = crypto.randomUUID() + crypto.randomUUID(); // 72 hex chars, plenty of entropy
+  // Generate token and store its hash in Redis with 5-minute TTL
+  const rawToken = crypto.randomUUID() + crypto.randomUUID();
   const tokenHash = await sha256(rawToken);
-  const expiresAt = new Date(Date.now() + MAGIC_LINK_TTL_SECONDS * 1000).toISOString();
 
-  // Upsert user (create if first time)
-  await sql`
-    INSERT INTO users (email) VALUES (${email})
-    ON CONFLICT (email) DO NOTHING
-  `;
-
+  // Upsert user
+  await sql`INSERT INTO users (email) VALUES (${email}) ON CONFLICT (email) DO NOTHING`;
   const [user] = await sql`SELECT id FROM users WHERE email = ${email}`;
 
-  await sql`
-    INSERT INTO auth_tokens (user_id, token_hash, type, expires_at)
-    VALUES (${user.id}, ${tokenHash}, 'magic_link', ${expiresAt})
-  `;
+  // Store in Redis: key = hash, value = userId, TTL = 5 min
+  await redis.set(`magic:${tokenHash}`, user.id, { ex: MAGIC_LINK_TTL_SECONDS });
 
   try {
     await sendMagicLinkEmail(email, rawToken);
   } catch (e) {
     console.error('[login] email send failed', e);
-    // Return 202 even if email fails — don't block or reveal whether the address exists
   }
 
   return ok({ message: 'Magic link sent. Check your email.' });
